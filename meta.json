@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "matchups": [
+    "BTN_vs_BB_srp",
+    "CO_vs_BB_srp",
+    "HJ_vs_BB_srp",
+    "LJ_vs_BB_srp",
+    "UTG_vs_BB_srp",
+    "SBr_vs_BB_srp",
+    "CO_vs_BTN_srp",
+    "HJ_vs_CO_srp",
+    "UTG_vs_BTN_srp",
+    "BB3b_vs_BTN",
+    "BB3b_vs_CO",
+    "BB3b_vs_HJ",
+    "BB3b_vs_LJ",
+    "BB3b_vs_UTG",
+    "SB3b_vs_BTN",
+    "SB3b_vs_CO",
+    "BTN3b_vs_CO",
+    "BTN3b_vs_HJ",
+    "CO3b_vs_HJ",
+    "BB3b_vs_SBr"
+  ],
+  "total_flops": 22100,
+  "runout_samples": 50,
+  "evaluator": "phevaluator",
+  "generated": "2026-05-16T15:38:24",
+  "compute_time_seconds": 5247,
+  "scheme": "canonical+lookup",
+  "canonical_count": 1755,
+  "note": "Look up any flop_key via lookup[flop_key] -> canonical_key, then canonical_flops[canonical_key].",
+  "file_structure": {
+    "lookup.json": "Maps 22100 flop keys -> canonical keys",
+    "summary.json": "Per-flop per-matchup: e(equity), n(nut_adv h/v/n), hh(hero_hands), vh(villain_hands)",
+    "hands/{matchup}.json": "Per-flop: {hand_class: equity} for all 169 classes"
+  }
+}
