@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GTO Equity Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%99%A0%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+  :root, [data-theme="dark"] {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #222221;
+    --surface-3: #2a2a28;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --accent-soft: rgba(57,135,229,0.16);
+    --div-mid: #383835;
+    --pole-hi: #5b9ce8;   /* hero-favorable (high equity) */
+    --pole-lo: #e05f5a;   /* villain-favorable (low equity) */
+    --heart: #e66767;
+    --diamond: #5598e7;
+    --club: #34b47a;
+    --spade: #d6d5cc;
+    --shadow: 0 8px 24px rgba(0,0,0,.45);
+  }
+  [data-theme="light"] {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f2f1ed;
+    --surface-3: #e9e8e2;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --accent-soft: rgba(42,120,214,0.12);
+    --div-mid: #f0efec;
+    --pole-hi: #1c5cab;
+    --pole-lo: #c02f2f;
+    --heart: #d03b3b;
+    --diamond: #2a78d6;
+    --club: #0c8a56;
+    --spade: #22211f;
+    --shadow: 0 8px 24px rgba(0,0,0,.10);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- header ---------- */
+  .app-header {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 20px;
+    background: color-mix(in srgb, var(--page) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+  .brand h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: .2px; }
+  .brand .sub { color: var(--muted); font-size: 12px; }
+  .tabs { display: flex; gap: 4px; margin-left: 8px; }
+  .tab {
+    border: 0; background: transparent; color: var(--ink-2);
+    padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;
+  }
+  .tab:hover { background: var(--surface-2); color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+  .header-spacer { flex: 1; }
+  .icon-btn {
+    border: 1px solid var(--border); background: var(--surface);
+    width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .icon-btn:hover { background: var(--surface-2); }
+
+  #loadbar {
+    position: fixed; top: 0; left: 0; height: 2px; width: 0%;
+    background: var(--accent); z-index: 100; transition: width .25s ease, opacity .4s;
+  }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 20px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---------- flop bar ---------- */
+  .flop-bar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 14px 16px; margin-bottom: 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  }
+  .flop-cards { display: flex; gap: 8px; }
+  .card-slot {
+    width: 58px; height: 80px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface-2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0; font-weight: 800; font-size: 22px; line-height: 1.05;
+    transition: transform .12s ease, border-color .12s ease;
+    padding: 0;
+  }
+  .card-slot:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .card-slot .suit { font-size: 20px; }
+  .card-slot.empty { color: var(--muted); font-size: 24px; font-weight: 400; border-style: dashed; }
+  .flop-entry { display: flex; flex-direction: column; gap: 6px; min-width: 230px; flex: 1; }
+  .flop-entry .row { display: flex; gap: 8px; }
+  .flop-entry input {
+    flex: 1; padding: 9px 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+    font: inherit; min-width: 160px;
+  }
+  .flop-entry input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  .btn {
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+    padding: 8px 14px; border-radius: 9px; cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-3); }
+  .btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .hint { color: var(--muted); font-size: 12px; }
+  .hint.error { color: var(--pole-lo); }
+  .flop-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tag {
+    font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: 2.5px 9px; border-radius: 999px; white-space: nowrap;
+  }
+
+  /* ---------- layout ---------- */
+  .content-grid { display: grid; grid-template-columns: minmax(360px, 5fr) minmax(430px, 6fr); gap: 18px; align-items: start; }
+  @media (max-width: 980px) { .content-grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px;
+  }
+  .panel h2 { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+  .panel .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+
+  /* ---------- matchup table ---------- */
+  .mu-group { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; padding: 10px 8px 4px; }
+  .mu-row {
+    display: grid; grid-template-columns: 132px 1fr 52px 72px;
+    gap: 10px; align-items: center;
+    width: 100%; text-align: left;
+    padding: 7px 8px; border: 0; border-radius: 9px; background: transparent; cursor: pointer;
+  }
+  .mu-row:hover { background: var(--surface-2); }
+  .mu-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .mu-name { font-weight: 600; font-size: 13px; white-space: nowrap; }
+  .mu-name .pos { color: var(--ink); }
+  .mu-name .ctx { color: var(--muted); font-weight: 500; }
+  .eq-bar { position: relative; height: 14px; background: var(--surface-3); border-radius: 4px; overflow: hidden; }
+  .eq-bar .center { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: .6; }
+  .eq-bar .fill { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
+  .eq-val { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; text-align: right; }
+  .nut-badge {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--ink-2); white-space: nowrap;
+  }
+  .nut-badge.h { color: var(--pole-hi); border-color: color-mix(in srgb, var(--pole-hi) 45%, transparent); }
+  .nut-badge.v { color: var(--pole-lo); border-color: color-mix(in srgb, var(--pole-lo) 45%, transparent); }
+
+  /* ---------- matrix ---------- */
+  .matrix-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .matrix-stats { display: flex; gap: 10px; margin: 10px 0 12px; flex-wrap: wrap; }
+  .stat-tile {
+    flex: 1; min-width: 110px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 12px;
+  }
+  .stat-tile .label { color: var(--muted); font-size: 11px; font-weight: 600; }
+  .stat-tile .value { font-size: 17px; font-weight: 800; }
+  .stat-tile .value small { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  #matrix {
+    display: grid; grid-template-columns: repeat(13, 1fr); gap: 2px;
+    background: var(--surface);
+    touch-action: manipulation;
+  }
+  .cell {
+    aspect-ratio: 1.18 / 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 3px; cursor: default;
+    font-size: 11px; font-weight: 700; line-height: 1.1;
+    transition: filter .08s ease;
+    min-width: 0;
+  }
+  .cell .eq { font-size: 9px; font-weight: 600; opacity: .85; display: none; }
+  #matrix.show-values .cell .eq { display: block; }
+  #matrix.show-values .cell { font-size: 10px; }
+  .cell:hover { filter: brightness(1.18); outline: 2px solid var(--ink); outline-offset: -2px; z-index: 2; }
+  .cell.pair { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent); }
+  .cell.dead { background: transparent !important; color: var(--muted) !important;
+    box-shadow: inset 0 0 0 1px var(--grid); opacity: .55; text-decoration: line-through; }
+  .matrix-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  .legend { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; }
+  .legend .ramp { flex: 1; height: 10px; border-radius: 5px; max-width: 260px; }
+  .legend .lab { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .switch { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-2); font-size: 12.5px; cursor: pointer; user-select: none; }
+  .switch input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  /* ---------- browser ---------- */
+  .browser-controls {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 14px 16px; margin-bottom: 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  }
+  .browser-controls select, .browser-controls input[type="search"] {
+    padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--ink); font: inherit;
+  }
+  .browser-controls input[type="search"] { width: 150px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-2);
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 600;
+  }
+  .chip:hover { background: var(--surface-3); }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  .flop-table { width: 100%; border-collapse: collapse; }
+  .flop-table th {
+    text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    padding: 8px 10px; border-bottom: 1px solid var(--grid);
+    background: var(--surface); cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  .flop-table th .arrow { font-size: 9px; }
+  .flop-table td { padding: 7px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  .flop-table tbody tr { cursor: pointer; }
+  .flop-table tbody tr:hover { background: var(--surface-2); }
+  .mini-cards { display: inline-flex; gap: 4px; font-weight: 700; }
+  .mini-card {
+    display: inline-flex; align-items: center; gap: 1px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 1px 6px; font-size: 12.5px;
+  }
+  .row-bar { position: relative; height: 12px; background: var(--surface-3); border-radius: 4px; width: 130px; }
+  .row-bar .center { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: .6; }
+  .row-bar .fill { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; }
+  .load-more { display: block; margin: 14px auto; }
+  .result-count { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  /* ---------- suits ---------- */
+  .s-h { color: var(--heart); } .s-d { color: var(--diamond); }
+  .s-c { color: var(--club); } .s-s { color: var(--spade); }
+
+  /* ---------- tooltip ---------- */
+  #tooltip {
+    position: fixed; z-index: 90; pointer-events: none; display: none;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 11px; font-size: 12.5px; box-shadow: var(--shadow); max-width: 260px;
+  }
+  #tooltip .t-title { font-weight: 800; font-size: 13px; }
+  #tooltip .t-line { color: var(--ink-2); }
+  #tooltip .t-line b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ---------- card picker ---------- */
+  #picker-overlay {
+    position: fixed; inset: 0; z-index: 80; display: none;
+    background: rgba(0,0,0,.45); align-items: center; justify-content: center; padding: 16px;
+  }
+  #picker-overlay.open { display: flex; }
+  #picker {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; box-shadow: var(--shadow); max-width: 620px; width: 100%;
+  }
+  #picker h3 { margin: 0 0 10px; font-size: 14px; }
+  .picker-grid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 4px; }
+  .pick-card {
+    border: 1px solid var(--border); background: var(--surface-2); border-radius: 6px;
+    padding: 5px 0; cursor: pointer; font-weight: 700; font-size: 12.5px; text-align: center;
+  }
+  .pick-card:hover { background: var(--surface-3); border-color: var(--accent); }
+  .pick-card:disabled { opacity: .25; cursor: not-allowed; }
+
+  /* ---------- error / empty ---------- */
+  .notice {
+    padding: 28px; text-align: center; color: var(--ink-2);
+    background: var(--surface); border: 1px dashed var(--border); border-radius: 14px;
+  }
+  .notice code { background: var(--surface-2); padding: 2px 7px; border-radius: 6px; font-size: 13px; }
+  .spin {
+    width: 22px; height: 22px; margin: 0 auto 10px; border-radius: 50%;
+    border: 3px solid var(--grid); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fade-in { animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  footer { max-width: 1180px; margin: 8px auto 28px; padding: 0 20px; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 560px) {
+    .mu-row { grid-template-columns: 92px 1fr 48px auto; gap: 7px; }
+    .mu-name .ctx { display: none; }
+    .brand .sub { display: none; }
+    main { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="loadbar"></div>
+
+<header class="app-header">
+  <div class="brand">
+    <h1>♠ GTO Equity Explorer</h1>
+    <span class="sub" id="brand-sub">loading database…</span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab" id="tab-explorer" role="tab" aria-selected="true">Flop explorer</button>
+    <button class="tab" id="tab-browser" role="tab" aria-selected="false">Flop browser</button>
+  </nav>
+  <div class="header-spacer"></div>
+  <button class="icon-btn" id="theme-toggle" title="Toggle light/dark theme" aria-label="Toggle theme">◐</button>
+</header>
+
+<main>
+  <section class="view active" id="view-explorer">
+    <div class="flop-bar">
+      <div class="flop-cards" id="flop-cards" aria-label="Selected flop"></div>
+      <div class="flop-entry">
+        <div class="row">
+          <input id="flop-input" type="text" placeholder="Type a flop, e.g. Ah Ks 7d" autocomplete="off"
+                 spellcheck="false" aria-label="Flop input">
+          <button class="btn primary" id="flop-go">Look up</button>
+          <button class="btn" id="flop-random" title="Random flop">🎲 Random</button>
+        </div>
+        <span class="hint" id="flop-hint">Ranks A K Q J T 9…2 · suits s h d c — “AhKs7d”, “as ks 7d” and “10h” all work. Press Enter to look up.</span>
+      </div>
+      <div class="flop-meta" id="flop-meta"></div>
+    </div>
+
+    <div id="explorer-body"></div>
+  </section>
+
+  <section class="view" id="view-browser">
+    <div class="browser-controls">
+      <label class="hint" for="browser-matchup">Matchup</label>
+      <select id="browser-matchup" aria-label="Matchup"></select>
+      <div class="chips" id="texture-chips" role="group" aria-label="Texture filters"></div>
+      <input type="search" id="browser-search" placeholder="Search flop… e.g. AK" aria-label="Search flops">
+      <span class="result-count" id="result-count"></span>
+    </div>
+    <div class="panel" style="padding: 4px 8px 8px; overflow-x:auto;">
+      <table class="flop-table" id="flop-table">
+        <thead><tr id="flop-table-head"></tr></thead>
+        <tbody id="flop-table-body"></tbody>
+      </table>
+      <button class="btn load-more" id="load-more" hidden>Show more flops</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Equities are hero-range vs villain-range on 1,755 strategically distinct flops (22,100 total), 50 runout samples per hand ·
+  “Hero” is the preflop aggressor of each matchup · data generated with phevaluator.
+</footer>
+
+<div id="tooltip" role="tooltip"></div>
+
+<div id="picker-overlay">
+  <div id="picker" role="dialog" aria-modal="true" aria-label="Pick a card">
+    <h3 id="picker-title">Pick a card</h3>
+    <div class="picker-grid" id="picker-grid"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ================= constants ================= */
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const RANK_VAL = Object.fromEntries(RANKS.map((r,i)=>[r, 14-i]));
+const SUITS = ['s','h','d','c'];
+const SUIT_SYM = { s:'♠', h:'♥', d:'♦', c:'♣' };
+const SUIT_ORDER = { c:0, d:1, h:2, s:3 };   // canonical key tie-break: suit ascending c<d<h<s
+
+const MATCHUPS = [
+  'UTG_vs_BB_srp','LJ_vs_BB_srp','HJ_vs_BB_srp','CO_vs_BB_srp','BTN_vs_BB_srp','SBr_vs_BB_srp',
+  'UTG_vs_BTN_srp','HJ_vs_CO_srp','CO_vs_BTN_srp',
+  'BB3b_vs_UTG','BB3b_vs_LJ','BB3b_vs_HJ','BB3b_vs_CO','BB3b_vs_BTN','BB3b_vs_SBr',
+  'SB3b_vs_CO','SB3b_vs_BTN','BTN3b_vs_HJ','BTN3b_vs_CO','CO3b_vs_HJ',
+];
+const SRP_SET = new Set(MATCHUPS.filter(m => m.endsWith('_srp')));
+
+function matchupInfo(id) {
+  // "BTN_vs_BB_srp" -> hero BTN (open-raiser), villain BB, SRP
+  // "BB3b_vs_BTN"   -> hero BB (3-bettor), villain BTN, 3-bet pot
+  const srp = id.endsWith('_srp');
+  const parts = id.replace(/_srp$/, '').split('_vs_');
+  let hero = parts[0], villain = parts[1];
+  const threeBet = hero.endsWith('3b');
+  hero = hero.replace(/3b$/, '');
+  const pretty = p => p === 'SBr' ? 'SB' : p;
+  return {
+    id, srp,
+    hero: pretty(hero), villain: pretty(villain),
+    heroRole: threeBet ? '3-bettor' : 'raiser',
+    label: `${pretty(hero)} vs ${pretty(villain)}`,
+    ctx: srp ? 'SRP' : '3-bet',
+    long: `${pretty(hero)} (${threeBet ? '3-bettor' : 'open raiser'}) vs ${pretty(villain)} — ${srp ? 'single-raised pot' : '3-bet pot'}`,
+  };
+}
+
+/* ================= state ================= */
+const state = {
+  lookup: null,        // flop key -> canonical key
+  summary: null,       // canonical -> { matchup: {e,n,hh,vh} }
+  weights: null,       // canonical -> number of real flops it represents
+  matchupData: new Map(),   // matchup id -> parsed hands json (LRU, max 4)
+  flop: null,          // ['A','h'] style? we keep ['Ah','Ks','7d']
+  canonical: null,
+  matchup: 'BTN_vs_BB_srp',
+  browser: { matchup: 'BTN_vs_BB_srp', texture: 'all', search: '', sortKey: 'e', sortDir: -1, shown: 100 },
+  showValues: false,
+  pickerSlot: 0,
+};
+
+/* ================= tiny helpers ================= */
+const $ = id => document.getElementById(id);
+const pct = v => (v*100).toFixed(1) + '%';
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function cardHTML(card, big) {
+  const r = card[0] === 'T' && !big ? 'T' : card[0];
+  const s = card[1];
+  return `<span class="s-${s}">${r}${SUIT_SYM[s]}</span>`;
+}
+
+/* diverging color scale, centered at 0.5 (hero equity) */
+function lerp(a,b,t){ return a + (b-a)*t; }
+function hex2rgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function rgb2css(c){ return `rgb(${c.map(Math.round).join(',')})`; }
+function mixRGB(a,b,t){ return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+function themeColors() {
+  const dark = document.documentElement.dataset.theme !== 'light';
+  return dark
+    ? { mid: hex2rgb('#383835'), hi: hex2rgb('#4e94e8'), hiX: hex2rgb('#9ec5f4'), lo: hex2rgb('#d94f4a'), loX: hex2rgb('#f3a6a0') }
+    : { mid: hex2rgb('#f0efec'), hi: hex2rgb('#4b93e2'), hiX: hex2rgb('#0d366b'), lo: hex2rgb('#e26a63'), loX: hex2rgb('#8f1d1a') };
+}
+/* span: half-range of the scale, i.e. equity mapped fully at 0.5 ± span */
+function divColor(e, span) {
+  const c = themeColors();
+  let t = Math.max(-1, Math.min(1, (e - 0.5) / span));
+  const a = Math.pow(Math.abs(t), 0.8);
+  if (t >= 0) return a < .55 ? rgb2css(mixRGB(c.mid, c.hi, a/.55)) : rgb2css(mixRGB(c.hi, c.hiX, (a-.55)/.45));
+  return a < .55 ? rgb2css(mixRGB(c.mid, c.lo, a/.55)) : rgb2css(mixRGB(c.lo, c.loX, (a-.55)/.45));
+}
+function inkFor(bg) {
+  const m = bg.match(/\d+/g).map(Number);
+  const lum = (0.2126*m[0] + 0.7152*m[1] + 0.0722*m[2]) / 255;
+  return lum > 0.56 ? '#0b0b0b' : '#ffffff';
+}
+
+/* ================= flop parsing & keys ================= */
+function parseFlopText(text) {
+  const t = text.trim().toUpperCase().replace(/10/g, 'T');
+  const m = t.match(/([AKQJT98765432])\s*([SHDC])/g);
+  if (!m || m.length !== 3) return { error: 'Enter exactly 3 cards, e.g. “Ah Ks 7d”.' };
+  const cards = m.map(x => x.replace(/\s+/g,'')).map(x => x[0] + x[1].toLowerCase());
+  if (new Set(cards).size !== 3) return { error: 'Cards must be distinct.' };
+  return { cards };
+}
+function sortFlop(cards) {
+  return [...cards].sort((a,b) =>
+    RANK_VAL[b[0]] - RANK_VAL[a[0]] || SUIT_ORDER[a[1]] - SUIT_ORDER[b[1]]);
+}
+function flopKey(cards) { return sortFlop(cards).join(''); }
+function canonicalFor(cards) {
+  const key = flopKey(cards);
+  if (state.lookup[key]) return state.lookup[key];
+  // fallback: try every ordering (defensive; sortFlop should always match)
+  const [a,b,c] = cards;
+  for (const p of [[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]]) {
+    const k = p.join('');
+    if (state.lookup[k]) return state.lookup[k];
+  }
+  return null;
+}
+function splitKey(key) { return [key.slice(0,2), key.slice(2,4), key.slice(4,6)]; }
+
+/* texture classification of a canonical flop */
+function texture(key) {
+  const cards = splitKey(key);
+  const ranks = cards.map(c => RANK_VAL[c[0]]);
+  const suits = cards.map(c => c[1]);
+  const tags = [];
+  const distinctRanks = new Set(ranks).size;
+  const distinctSuits = new Set(suits).size;
+  if (distinctRanks === 1) tags.push('trips');
+  else if (distinctRanks === 2) tags.push('paired');
+  if (distinctSuits === 1) tags.push('monotone');
+  else if (distinctSuits === 2) tags.push('two-tone');
+  else tags.push('rainbow');
+  if (distinctRanks === 3) {
+    const rs = [...ranks].sort((x,y)=>y-x);
+    const wheel = ranks.includes(14) ? [...ranks.map(r=>r===14?1:r)].sort((x,y)=>y-x) : null;
+    if (rs[0]-rs[2] <= 4 || (wheel && wheel[0]-wheel[2] <= 4)) tags.push('connected');
+  }
+  const hi = Math.max(...ranks);
+  if (ranks.every(r => r >= 10)) tags.push('broadway');
+  else if (hi === 14) tags.push('ace-high');
+  else if (hi <= 9) tags.push('low');
+  return tags;
+}
+
+/* ================= data loading ================= */
+const loadbar = $('loadbar');
+function setProgress(p) {
+  loadbar.style.opacity = p >= 1 ? 0 : 1;
+  loadbar.style.width = Math.min(100, p*100) + '%';
+  if (p >= 1) setTimeout(() => { loadbar.style.width = '0%'; }, 450);
+}
+
+async function fetchJSON(path, onChunk) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+  if (!res.body || !onChunk) return res.json();
+  const total = +res.headers.get('Content-Length') || 0;
+  const reader = res.body.getReader();
+  const chunks = []; let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); got += value.length;
+    if (total) onChunk(got/total);
+  }
+  const buf = new Uint8Array(got);
+  let off = 0; for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return JSON.parse(new TextDecoder().decode(buf));
+}
+
+async function loadCore() {
+  try {
+    setProgress(0.05);
+    const [lookup, summary] = await Promise.all([
+      fetchJSON('lookup.json'),
+      fetchJSON('summary.json', f => setProgress(0.1 + f*0.85)),
+    ]);
+    state.lookup = lookup;
+    state.summary = summary;
+    const w = {};
+    for (const k in lookup) w[lookup[k]] = (w[lookup[k]] || 0) + 1;
+    state.weights = w;
+    setProgress(1);
+    $('brand-sub').textContent = '1,755 flops × 20 matchups × 169 hands';
+    initFromHash();
+    renderBrowser(true);
+  } catch (err) {
+    setProgress(1);
+    $('explorer-body').innerHTML = `
+      <div class="notice">
+        <p><b>Couldn’t load the database</b> (${esc(String(err.message || err))}).</p>
+        <p>This page fetches the JSON files next to it, so it needs to be served over HTTP —
+        opening the file directly won’t work.</p>
+        <p>From the repo folder run <code>python3 -m http.server 8000</code> and open
+        <code>http://localhost:8000</code>, or enable GitHub Pages for this repo.</p>
+      </div>`;
+  }
+}
+
+async function loadMatchup(id) {
+  if (state.matchupData.has(id)) {
+    const v = state.matchupData.get(id);          // refresh LRU order
+    state.matchupData.delete(id); state.matchupData.set(id, v);
+    return v;
+  }
+  setProgress(0.15);
+  const data = await fetchJSON(`${id}.json`, f => setProgress(0.15 + f*0.8));
+  setProgress(1);
+  state.matchupData.set(id, data);
+  while (state.matchupData.size > 4) state.matchupData.delete(state.matchupData.keys().next().value);
+  return data;
+}
+
+/* ================= tooltip ================= */
+const tooltip = $('tooltip');
+function showTooltip(html, x, y) {
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  const r = tooltip.getBoundingClientRect();
+  let left = x + 14, top = y + 14;
+  if (left + r.width > innerWidth - 8) left = x - r.width - 12;
+  if (top + r.height > innerHeight - 8) top = y - r.height - 12;
+  tooltip.style.left = left + 'px';
+  tooltip.style.top = top + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+/* ================= explorer rendering ================= */
+function renderFlopSlots() {
+  const holder = $('flop-cards');
+  holder.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const card = state.flop ? state.flop[i] : null;
+    const btn = document.createElement('button');
+    btn.className = 'card-slot' + (card ? '' : ' empty');
+    btn.title = 'Change this card';
+    if (card) {
+      const r = card[0], s = card[1];
+      btn.innerHTML = `<span class="s-${s}">${r === 'T' ? '10' : r}</span><span class="suit s-${s}">${SUIT_SYM[s]}</span>`;
+    } else btn.textContent = '+';
+    btn.addEventListener('click', () => openPicker(i));
+    holder.appendChild(btn);
+  }
+}
+
+function renderFlopMeta() {
+  const holder = $('flop-meta');
+  if (!state.canonical) { holder.innerHTML = ''; return; }
+  const tags = texture(state.canonical).map(t => `<span class="tag">${t}</span>`).join('');
+  const w = state.weights[state.canonical] || 1;
+  holder.innerHTML = tags + `<span class="tag" title="Number of suit-equivalent flops sharing this solution">≡ ${w} flop${w>1?'s':''}</span>`;
+}
+
+function renderExplorer() {
+  const body = $('explorer-body');
+  if (!state.canonical) {
+    body.innerHTML = `<div class="notice">
+      <p style="font-size:15px"><b>Pick a flop to explore.</b></p>
+      <p>Type one above, tap the card slots, or hit 🎲 Random.<br>
+      You’ll get hero-vs-villain range equity for all 20 preflop matchups,<br>
+      plus a 169-hand equity heatmap for any matchup.</p>
+    </div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="content-grid fade-in">
+      <div class="panel">
+        <h2>Range vs range, all matchups</h2>
+        <p class="sub">Hero = preflop aggressor. Bar shows hero equity around the 50% line. Click a row to load its hand heatmap.</p>
+        <div id="mu-list"></div>
+      </div>
+      <div class="panel">
+        <div class="matrix-head">
+          <div>
+            <h2 id="matrix-title"></h2>
+            <p class="sub" id="matrix-sub"></p>
+          </div>
+        </div>
+        <div class="matrix-stats" id="matrix-stats"></div>
+        <div id="matrix" aria-label="Hand equity heatmap"></div>
+        <div class="matrix-foot">
+          <div class="legend">
+            <span class="lab" id="legend-lo"></span>
+            <div class="ramp" id="legend-ramp"></div>
+            <span class="lab" id="legend-hi"></span>
+          </div>
+          <label class="switch"><input type="checkbox" id="show-values"> Show numbers</label>
+        </div>
+      </div>
+    </div>`;
+  $('show-values').checked = state.showValues;
+  $('show-values').addEventListener('change', e => {
+    state.showValues = e.target.checked;
+    $('matrix').classList.toggle('show-values', state.showValues);
+  });
+  renderMatchupList();
+  renderMatrix();
+}
+
+function eqBarHTML(e, cls, span) {
+  const t = Math.max(-1, Math.min(1, (e - 0.5) / span));
+  const w = Math.abs(t) * 50;
+  const color = t >= 0 ? 'var(--pole-hi)' : 'var(--pole-lo)';
+  const pos = t >= 0 ? `left:50%; width:${w}%` : `right:50%; width:${w}%`;
+  return `<div class="${cls}"><div class="center"></div><div class="fill" style="${pos}; background:${color}"></div></div>`;
+}
+
+function renderMatchupList() {
+  const list = $('mu-list');
+  const data = state.summary[state.canonical];
+  list.innerHTML = '';
+  const groups = [['Single-raised pots', MATCHUPS.filter(m => SRP_SET.has(m))],
+                  ['3-bet pots', MATCHUPS.filter(m => !SRP_SET.has(m))]];
+  for (const [title, ids] of groups) {
+    const g = document.createElement('div');
+    g.className = 'mu-group'; g.textContent = title;
+    list.appendChild(g);
+    for (const id of ids) {
+      const d = data[id];
+      const info = matchupInfo(id);
+      const row = document.createElement('button');
+      row.className = 'mu-row';
+      row.setAttribute('aria-selected', id === state.matchup);
+      const nut = d.n === 'h' ? `<span class="nut-badge h">▲ hero</span>`
+               : d.n === 'v' ? `<span class="nut-badge v">▼ villain</span>`
+               : `<span class="nut-badge">— even</span>`;
+      row.innerHTML = `
+        <span class="mu-name"><span class="pos">${info.label}</span> <span class="ctx">· ${info.ctx}</span></span>
+        ${eqBarHTML(d.e, 'eq-bar', 0.15)}
+        <span class="eq-val">${pct(d.e)}</span>
+        ${nut}`;
+      row.addEventListener('mousemove', ev => showTooltip(
+        `<div class="t-title">${esc(info.long)}</div>
+         <div class="t-line">Hero range equity <b>${pct(d.e)}</b></div>
+         <div class="t-line">Nut advantage: <b>${d.n === 'h' ? 'hero' : d.n === 'v' ? 'villain' : 'neutral'}</b></div>
+         <div class="t-line">Range sizes — hero <b>${d.hh}</b> · villain <b>${d.vh}</b></div>`,
+        ev.clientX, ev.clientY));
+      row.addEventListener('mouseleave', hideTooltip);
+      row.addEventListener('click', () => { setMatchup(id); });
+      list.appendChild(row);
+    }
+  }
+}
+
+let matrixCells = null;
+function buildMatrixDOM() {
+  const matrix = $('matrix');
+  matrix.innerHTML = '';
+  matrix.classList.toggle('show-values', state.showValues);
+  matrixCells = [];
+  for (let i = 0; i < 13; i++) {
+    for (let j = 0; j < 13; j++) {
+      const hand = i === j ? RANKS[i] + RANKS[j]
+                 : i < j ? RANKS[i] + RANKS[j] + 's'
+                 : RANKS[j] + RANKS[i] + 'o';
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (i === j ? ' pair' : '');
+      cell.dataset.hand = hand;
+      cell.innerHTML = `<span>${hand}</span><span class="eq"></span>`;
+      matrix.appendChild(cell);
+      matrixCells.push(cell);
+    }
+  }
+  matrix.addEventListener('mousemove', ev => {
+    const cell = ev.target.closest('.cell');
+    if (!cell) { hideTooltip(); return; }
+    if (!cell.dataset.eq) {
+      if (cell.classList.contains('dead')) showTooltip(
+        `<div class="t-title">${cell.dataset.hand}</div>
+         <div class="t-line">No combos possible — the board uses these cards.</div>`,
+        ev.clientX, ev.clientY);
+      else hideTooltip();
+      return;
+    }
+    const info = matchupInfo(state.matchup);
+    showTooltip(
+      `<div class="t-title">${cell.dataset.hand}</div>
+       <div class="t-line"><b>${pct(+cell.dataset.eq)}</b> equity vs ${esc(info.villain)}’s range</div>
+       <div class="t-line">on ${splitKey(state.canonical).map(c => c[0]===
+         'T' ? '10'+SUIT_SYM[c[1]] : c[0]+SUIT_SYM[c[1]]).join(' ')}</div>`,
+      ev.clientX, ev.clientY);
+  });
+  matrix.addEventListener('mouseleave', hideTooltip);
+}
+
+async function renderMatrix() {
+  const info = matchupInfo(state.matchup);
+  $('matrix-title').textContent = `${info.long}`;
+  const flopPretty = splitKey(state.canonical)
+    .map(c => `<span class="s-${c[1]}">${c[0]==='T'?'10':c[0]}${SUIT_SYM[c[1]]}</span>`).join(' ');
+  $('matrix-sub').innerHTML =
+    `Equity of each ${esc(info.hero)} hand class vs ${esc(info.villain)}’s full range on ${flopPretty}. Blue favors ${esc(info.hero)}, red favors ${esc(info.villain)}.`;
+  if (!matrixCells) buildMatrixDOM();
+  const statHolder = $('matrix-stats');
+  statHolder.innerHTML = `<div class="stat-tile"><div class="label">Loading hand equities…</div><div class="spin" style="margin:8px 0 2px"></div></div>`;
+  let hands;
+  try {
+    hands = (await loadMatchup(state.matchup))[state.canonical];
+  } catch (err) {
+    statHolder.innerHTML = `<div class="stat-tile"><div class="label">Failed to load ${esc(state.matchup)}.json</div><div class="value" style="font-size:13px">${esc(String(err.message||err))}</div></div>`;
+    return;
+  }
+  if (!hands) { statHolder.innerHTML = ''; return; }
+
+  const summ = state.summary[state.canonical][state.matchup];
+  const entries = Object.entries(hands);
+  let best = entries[0], worst = entries[0];
+  for (const e of entries) { if (e[1] > best[1]) best = e; if (e[1] < worst[1]) worst = e; }
+  statHolder.innerHTML = `
+    <div class="stat-tile"><div class="label">Range vs range</div><div class="value">${pct(summ.e)}</div></div>
+    <div class="stat-tile"><div class="label">Nut advantage</div><div class="value">${summ.n==='h'?'▲ Hero':summ.n==='v'?'▼ Villain':'— Even'}</div></div>
+    <div class="stat-tile"><div class="label">Best class</div><div class="value">${best[0]} <small>${pct(best[1])}</small></div></div>
+    <div class="stat-tile"><div class="label">Worst class</div><div class="value">${worst[0]} <small>${pct(worst[1])}</small></div></div>`;
+
+  const SPAN = 0.35;   // heatmap fully saturated at 50% ± 35pp
+  for (const cell of matrixCells) {
+    const e = hands[cell.dataset.hand];
+    if (typeof e !== 'number') {
+      // zero combos left (e.g. pocket 22 on a 222 flop) — the DB omits the class
+      cell.classList.add('dead');
+      cell.style.background = '';
+      cell.style.color = '';
+      delete cell.dataset.eq;
+      cell.querySelector('.eq').textContent = '–';
+      continue;
+    }
+    cell.classList.remove('dead');
+    const bg = divColor(e, SPAN);
+    cell.style.background = bg;
+    cell.style.color = inkFor(bg);
+    cell.dataset.eq = e;
+    cell.querySelector('.eq').textContent = Math.round(e*100);
+  }
+  const stops = [];
+  for (let i = 0; i <= 10; i++) stops.push(divColor(0.5 - SPAN + (i/10)*2*SPAN, SPAN));
+  $('legend-ramp').style.background = `linear-gradient(90deg, ${stops.join(',')})`;
+  $('legend-lo').textContent = `≤ ${Math.round((0.5-SPAN)*100)}%`;
+  $('legend-hi').textContent = `≥ ${Math.round((0.5+SPAN)*100)}%`;
+}
+
+/* ================= state changes ================= */
+function setFlop(cards, { fromHash = false } = {}) {
+  const canonical = canonicalFor(cards);
+  if (!canonical) { flopError('That flop isn’t in the database.'); return false; }
+  state.flop = sortFlop(cards);
+  state.canonical = canonical;
+  matrixCells = null;
+  flopError('');
+  renderFlopSlots();
+  renderFlopMeta();
+  renderExplorer();
+  if (!fromHash) pushHash();
+  return true;
+}
+function setMatchup(id, { fromHash = false } = {}) {
+  if (state.matchup === id && !fromHash) return;
+  state.matchup = id;
+  document.querySelectorAll('#mu-list .mu-row').forEach((r, idx) => {
+    const ordered = [...MATCHUPS.filter(m=>SRP_SET.has(m)), ...MATCHUPS.filter(m=>!SRP_SET.has(m))];
+    r.setAttribute('aria-selected', ordered[idx] === id);
+  });
+  renderMatrix();
+  if (!fromHash) pushHash();
+}
+function flopError(msg) {
+  const hint = $('flop-hint');
+  if (msg) { hint.textContent = msg; hint.className = 'hint error'; }
+  else {
+    hint.textContent = 'Ranks A K Q J T 9…2 · suits s h d c — “AhKs7d”, “as ks 7d” and “10h” all work. Press Enter to look up.';
+    hint.className = 'hint';
+  }
+}
+function randomFlop() {
+  const deck = [];
+  for (const r of RANKS) for (const s of SUITS) deck.push(r + s);
+  const picked = [];
+  while (picked.length < 3) {
+    const c = deck[Math.floor(Math.random() * deck.length)];
+    if (!picked.includes(c)) picked.push(c);
+  }
+  $('flop-input').value = '';
+  setFlop(picked);
+}
+
+/* ================= card picker ================= */
+function openPicker(slot) {
+  state.pickerSlot = slot;
+  $('picker-title').textContent = `Pick card ${slot+1} of the flop`;
+  const grid = $('picker-grid');
+  grid.innerHTML = '';
+  const taken = new Set(state.flop ? state.flop.filter((_, i) => i !== slot) : []);
+  for (const s of SUITS) for (const r of RANKS) {
+    const card = r + s;
+    const b = document.createElement('button');
+    b.className = `pick-card s-${s}`;
+    b.innerHTML = `${r==='T'?'10':r}${SUIT_SYM[s]}`;
+    b.disabled = taken.has(card);
+    b.addEventListener('click', () => {
+      closePicker();
+      const cur = state.flop ? [...state.flop] : [null, null, null];
+      cur[slot] = card;
+      if (cur.every(Boolean)) { $('flop-input').value=''; setFlop(cur); }
+      else { state.flop = cur; renderFlopSlots(); openPicker(cur.indexOf(null)); }
+    });
+    grid.appendChild(b);
+  }
+  $('picker-overlay').classList.add('open');
+}
+function closePicker() { $('picker-overlay').classList.remove('open'); }
+$('picker-overlay').addEventListener('click', e => { if (e.target === $('picker-overlay')) closePicker(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+
+/* ================= browser view ================= */
+const TEXTURE_FILTERS = ['all','paired','trips','monotone','two-tone','rainbow','connected','broadway','ace-high','low'];
+const BROWSER_COLS = [
+  { key: 'flop', label: 'Flop' },
+  { key: 'texture', label: 'Texture', sortable: false },
+  { key: 'e', label: 'Hero equity' },
+  { key: 'n', label: 'Nut adv' },
+  { key: 'w', label: '≡ Flops' },
+];
+let browserRows = null;   // cached [{key, e, n, w, tags, hi}]
+
+function buildBrowserRows() {
+  const mu = state.browser.matchup;
+  browserRows = Object.keys(state.summary).map(key => {
+    const d = state.summary[key][mu];
+    return { key, e: d.e, n: d.n, w: state.weights[key] || 1, tags: texture(key),
+             hi: RANK_VAL[key[0]], search: key.toUpperCase() };
+  });
+}
+
+function renderBrowserControls() {
+  const sel = $('browser-matchup');
+  if (!sel.options.length) {
+    for (const id of MATCHUPS) {
+      const o = document.createElement('option');
+      const info = matchupInfo(id);
+      o.value = id; o.textContent = `${info.label} · ${info.ctx}`;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => {
+      state.browser.matchup = sel.value; state.browser.shown = 100;
+      buildBrowserRows(); renderBrowserTable(); pushHash();
+    });
+    const chips = $('texture-chips');
+    for (const t of TEXTURE_FILTERS) {
+      const c = document.createElement('button');
+      c.className = 'chip'; c.textContent = t;
+      c.setAttribute('aria-pressed', t === state.browser.texture);
+      c.addEventListener('click', () => {
+        state.browser.texture = t; state.browser.shown = 100;
+        chips.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', x.textContent === t));
+        renderBrowserTable();
+      });
+      chips.appendChild(c);
+    }
+    let debounce;
+    $('browser-search').addEventListener('input', e => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        state.browser.search = e.target.value.trim().toUpperCase().replace(/10/g,'T');
+        state.browser.shown = 100;
+        renderBrowserTable();
+      }, 120);
+    });
+    $('load-more').addEventListener('click', () => { state.browser.shown += 200; renderBrowserTable(true); });
+  }
+  sel.value = state.browser.matchup;
+}
+
+function renderBrowserHead() {
+  const tr = $('flop-table-head');
+  tr.innerHTML = '';
+  for (const col of BROWSER_COLS) {
+    const th = document.createElement('th');
+    const active = state.browser.sortKey === col.key;
+    th.innerHTML = col.label + (active ? ` <span class="arrow">${state.browser.sortDir > 0 ? '▲' : '▼'}</span>` : '');
+    if (col.sortable !== false) th.addEventListener('click', () => {
+      if (state.browser.sortKey === col.key) state.browser.sortDir *= -1;
+      else { state.browser.sortKey = col.key; state.browser.sortDir = col.key === 'flop' ? -1 : -1; }
+      state.browser.shown = 100;
+      renderBrowserTable();
+    });
+    else th.style.cursor = 'default';
+    tr.appendChild(th);
+  }
+}
+
+function filteredSortedRows() {
+  const { texture: tex, search, sortKey, sortDir } = state.browser;
+  let rows = browserRows;
+  if (tex !== 'all') rows = rows.filter(r => r.tags.includes(tex));
+  if (search) rows = rows.filter(r => r.search.includes(search) ||
+    r.search.replace(/[CDHS]/g,'').includes(search.replace(/[CDHS]/g,'')));
+  const nOrder = { h: 2, n: 1, v: 0 };
+  rows = [...rows].sort((a,b) => {
+    let d = 0;
+    if (sortKey === 'e') d = a.e - b.e;
+    else if (sortKey === 'w') d = a.w - b.w;
+    else if (sortKey === 'n') d = nOrder[a.n] - nOrder[b.n] || a.e - b.e;
+    else d = a.hi - b.hi || a.search.localeCompare(b.search);
+    return d * sortDir;
+  });
+  return rows;
+}
+
+function renderBrowserTable(append = false) {
+  renderBrowserHead();
+  const rows = filteredSortedRows();
+  const tbody = $('flop-table-body');
+  const upto = Math.min(rows.length, state.browser.shown);
+  const start = append ? tbody.children.length : 0;
+  if (!append) tbody.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (let i = start; i < upto; i++) {
+    const r = rows[i];
+    const tr = document.createElement('tr');
+    const cards = splitKey(r.key).map(c =>
+      `<span class="mini-card">${cardHTML(c[0]==='T' ? c : c, false)}</span>`).join('');
+    const nut = r.n === 'h' ? '<span class="nut-badge h">▲ hero</span>'
+             : r.n === 'v' ? '<span class="nut-badge v">▼ villain</span>'
+             : '<span class="nut-badge">— even</span>';
+    tr.innerHTML = `
+      <td><span class="mini-cards">${cards}</span></td>
+      <td>${r.tags.map(t=>`<span class="tag">${t}</span>`).join(' ')}</td>
+      <td><div style="display:flex;align-items:center;gap:10px">${eqBarHTML(r.e,'row-bar',0.15)}<b style="font-variant-numeric:tabular-nums">${pct(r.e)}</b></div></td>
+      <td>${nut}</td>
+      <td style="color:var(--muted)">${r.w}</td>`;
+    tr.addEventListener('click', () => {
+      state.matchup = state.browser.matchup;
+      setFlop(splitKey(r.key));
+      switchView('explorer');
+      scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    frag.appendChild(tr);
+  }
+  tbody.appendChild(frag);
+  $('load-more').hidden = upto >= rows.length;
+  $('load-more').textContent = `Show more flops (${rows.length - upto} remaining)`;
+  $('result-count').textContent = `${rows.length.toLocaleString()} flop${rows.length===1?'':'s'}`;
+}
+
+function renderBrowser(first) {
+  if (!state.summary) return;
+  renderBrowserControls();
+  if (!browserRows || first) buildBrowserRows();
+  renderBrowserTable();
+}
+
+/* ================= views, theme, hash ================= */
+function switchView(name, { fromHash = false } = {}) {
+  $('view-explorer').classList.toggle('active', name === 'explorer');
+  $('view-browser').classList.toggle('active', name === 'browser');
+  $('tab-explorer').setAttribute('aria-selected', name === 'explorer');
+  $('tab-browser').setAttribute('aria-selected', name === 'browser');
+  state.view = name;
+  if (!fromHash) pushHash();
+}
+$('tab-explorer').addEventListener('click', () => switchView('explorer'));
+$('tab-browser').addEventListener('click', () => switchView('browser'));
+
+$('theme-toggle').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('gto-theme', next); } catch {}
+  if (state.canonical) renderMatrix();
+});
+try {
+  const saved = localStorage.getItem('gto-theme');
+  if (saved) document.documentElement.dataset.theme = saved;
+} catch {}
+
+let applyingHash = false;
+function pushHash() {
+  if (applyingHash) return;
+  const p = new URLSearchParams();
+  if (state.view === 'browser') { p.set('v','browser'); p.set('bm', state.browser.matchup); }
+  if (state.canonical) { p.set('f', state.flop.join('')); p.set('m', state.matchup); }
+  history.replaceState(null, '', '#' + p.toString());
+}
+function initFromHash() {
+  applyingHash = true;
+  const p = new URLSearchParams(location.hash.slice(1));
+  const m = p.get('m');
+  if (m && MATCHUPS.includes(m)) state.matchup = m;
+  const bm = p.get('bm');
+  if (bm && MATCHUPS.includes(bm)) state.browser.matchup = bm;
+  const f = p.get('f');
+  let ok = false;
+  if (f) {
+    const parsed = parseFlopText(f.match(/.{2}/g)?.join(' ') || '');
+    if (!parsed.error) ok = setFlop(parsed.cards, { fromHash: true });
+  }
+  if (!ok) renderExplorer();
+  if (p.get('v') === 'browser') switchView('browser', { fromHash: true });
+  else switchView('explorer', { fromHash: true });
+  applyingHash = false;
+}
+addEventListener('hashchange', () => {
+  if (!applyingHash && state.summary) { initFromHash(); renderBrowser(true); }
+});
+
+/* ================= input wiring ================= */
+function submitFlopInput() {
+  const parsed = parseFlopText($('flop-input').value);
+  if (parsed.error) { flopError(parsed.error); return; }
+  setFlop(parsed.cards);
+}
+$('flop-go').addEventListener('click', submitFlopInput);
+$('flop-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitFlopInput(); });
+$('flop-input').addEventListener('input', () => flopError(''));
+$('flop-random').addEventListener('click', randomFlop);
+
+/* ================= boot ================= */
+renderFlopSlots();
+renderExplorer();
+loadCore();
+</script>
+</body>
+</html>
